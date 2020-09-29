@@ -271,7 +271,7 @@ namespace s2industries.ZUGFeRD
                         #endregion
 
                         #region BasisAmount
-                        Writer.WriteStartElement("ram:BasisAmount", profile: Profile.Extended | Profile.XRechnung1 | Profile.XRechnung);
+                        Writer.WriteStartElement("ram:BasisAmount", profile: Profile.Extended);
                         Writer.WriteValue(_formatDecimal(tradeAllowanceCharge.BasisAmount, 2));
                         Writer.WriteEndElement();
                         #endregion
