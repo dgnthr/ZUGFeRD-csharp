@@ -74,6 +74,8 @@ namespace s2industries.ZUGFeRD
 
         /// <summary>
         /// Detailed information on the associated contract
+        /// 
+        /// BT-12
         /// </summary>
         public ContractReferencedDocument ContractReferencedDocument { get; set; }
 
@@ -117,8 +119,15 @@ namespace s2industries.ZUGFeRD
         public bool IsTest { get; set; } = false;
         public Profile Profile { get; internal set; } = Profile.Basic;
         public InvoiceType Type { get; set; } = InvoiceType.Invoice;
+
+        /// <summary>
+        /// The identifier is defined by the buyer (e.g. contact ID, department, office ID, project code), but provided by the seller in the invoice. 
+        /// In France it needs to be filled with 999, if not available.
+        /// 
+        /// BT-10
+        /// </summary>
         public string ReferenceOrderNo { get; set; }
-        public List<TradeLineItem> TradeLineItems { get; set; } = new List<TradeLineItem>();
+        public List<TradeLineItem> TradeLineItems { get; internal set; } = new List<TradeLineItem>();
 
 
         public decimal LineTotalAmount { get; set; } = Decimal.MinValue;
@@ -134,6 +143,7 @@ namespace s2industries.ZUGFeRD
         public List<TradeAllowanceCharge> TradeAllowanceCharges { get; set; } = new List<TradeAllowanceCharge>();
         public PaymentTerms PaymentTerms { get; set; }        
         public InvoiceReferencedDocument InvoiceReferencedDocument { get; set; }
+        public List<ReceivableSpecifiedTradeAccountingAccount> ReceivableSpecifiedTradeAccountingAccounts { get; internal set; } = new List<ReceivableSpecifiedTradeAccountingAccount>();
         public List<BankAccount> CreditorBankAccounts { get; set; } = new List<BankAccount>();
         public List<BankAccount> DebitorBankAccounts { get; set; } = new List<BankAccount>();
         public PaymentMeans PaymentMeans { get; set; }
@@ -781,6 +791,18 @@ namespace s2industries.ZUGFeRD
             });
         } // !AddDebitorFinancialAccount()
 
+        public void AddReceivableSpecifiedTradeAccountingAccount(string AccountID)
+        {
+            AddReceivableSpecifiedTradeAccountingAccount(AccountID, AccountingAccountTypeCodes.Unknown);
+        }
+        public void AddReceivableSpecifiedTradeAccountingAccount(string AccountID, AccountingAccountTypeCodes AccountTypeCode)
+        {
+            this.ReceivableSpecifiedTradeAccountingAccounts.Add(new ReceivableSpecifiedTradeAccountingAccount()
+            {
+                TradeAccountID = AccountID,
+                TradeAccountTypeCode = AccountTypeCode
+            });
+        }
 
         private string _getNextLineId()
         {

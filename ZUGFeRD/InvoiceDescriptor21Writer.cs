@@ -103,9 +103,6 @@ namespace s2industries.ZUGFeRD
             Writer.WriteEndElement(); // !rsm:ExchangedDocument
             #endregion
 
-            /*
-             * @todo continue here to adopt v2 tag names
-             */
 
             #region SpecifiedSupplyChainTradeTransaction
             //Gruppierung der Informationen zum Geschäftsvorfall
@@ -256,7 +253,7 @@ namespace s2industries.ZUGFeRD
                     _writeOptionalAmount(Writer, "ram:ChargeAmount", tradeLineItem.GrossUnitPrice, 2);
                     if (tradeLineItem.UnitQuantity.HasValue)
                     {
-                        _writeElementWithAttribute(Writer, "ram:BasisQuantity", "unitCode", tradeLineItem.UnitCode.EnumToString(), _formatDecimal(tradeLineItem.UnitQuantity.Value, 2));
+                        _writeElementWithAttribute(Writer, "ram:BasisQuantity", "unitCode", tradeLineItem.UnitCode.EnumToString(), _formatDecimal(tradeLineItem.UnitQuantity.Value, 4));
                     }
 
                     #region AppliedTradeAllowanceCharge
@@ -294,11 +291,11 @@ namespace s2industries.ZUGFeRD
                     #region NetPriceProductTradePrice                    
                     //Im Nettopreis sind alle Zu- und Abschläge enthalten, jedoch nicht die Umsatzsteuer.
                     Writer.WriteStartElement("ram:NetPriceProductTradePrice", Profile.Basic | Profile.Comfort | Profile.Extended | Profile.XRechnung1 | Profile.XRechnung);
-                    _writeOptionalAmount(Writer, "ram:ChargeAmount", tradeLineItem.NetUnitPrice, 2);
+                    _writeOptionalAmount(Writer, "ram:ChargeAmount", tradeLineItem.NetUnitPrice, 4);
 
                     if (tradeLineItem.UnitQuantity.HasValue)
                     {
-                        _writeElementWithAttribute(Writer, "ram:BasisQuantity", "unitCode", tradeLineItem.UnitCode.EnumToString(), _formatDecimal(tradeLineItem.UnitQuantity.Value, 2));
+                        _writeElementWithAttribute(Writer, "ram:BasisQuantity", "unitCode", tradeLineItem.UnitCode.EnumToString(), _formatDecimal(tradeLineItem.UnitQuantity.Value, 4));
                     }
                     Writer.WriteEndElement(); // ram:NetPriceProductTradePrice(Basic|Comfort|Extended|XRechnung)                    
                     #endregion // !NetPriceProductTradePrice(Basic|Comfort|Extended|XRechnung)
@@ -312,7 +309,7 @@ namespace s2industries.ZUGFeRD
 
                 #region SpecifiedLineTradeDelivery (Basic, Comfort, Extended)
                 Writer.WriteStartElement("ram:SpecifiedLineTradeDelivery", Profile.Basic | Profile.Comfort | Profile.Extended | Profile.XRechnung1 | Profile.XRechnung);
-                _writeElementWithAttribute(Writer, "ram:BilledQuantity", "unitCode", tradeLineItem.UnitCode.EnumToString(), _formatDecimal(tradeLineItem.BilledQuantity, 2));
+                _writeElementWithAttribute(Writer, "ram:BilledQuantity", "unitCode", tradeLineItem.UnitCode.EnumToString(), _formatDecimal(tradeLineItem.BilledQuantity, 4));
 
                 if (tradeLineItem.DeliveryNoteReferencedDocument != null)
                 {
@@ -410,7 +407,40 @@ namespace s2industries.ZUGFeRD
 
                 #region ReceivableSpecifiedTradeAccountingAccount
                 //Detailinformationen zur Buchungsreferenz
-                //ToDo: ReceivableSpecifiedTradeAccountingAccount
+                if (descriptor.Profile == Profile.XRechnung1 || descriptor.Profile == Profile.XRechnung && tradeLineItem.ReceivableSpecifiedTradeAccountingAccounts.Count > 0)
+                {
+                    //only one ReceivableSpecifiedTradeAccountingAccount (BT-133) is allowed in Profile XRechnung
+                    Writer.WriteStartElement("ram:ReceivableSpecifiedTradeAccountingAccount", Profile.Comfort | Profile.Extended | Profile.XRechnung1 | Profile.XRechnung);
+                    {
+                        Writer.WriteStartElement("ram:ID");
+                        Writer.WriteValue(tradeLineItem.ReceivableSpecifiedTradeAccountingAccounts[0].TradeAccountID);  //BT-133
+                        Writer.WriteEndElement(); // !ram:ID
+                    }
+                    Writer.WriteEndElement(); // !ram:ReceivableSpecifiedTradeAccountingAccount
+                }
+                else
+                {
+                    //multiple ReceivableSpecifiedTradeAccountingAccounts are allowed in other profiles
+                    foreach (ReceivableSpecifiedTradeAccountingAccount RSTA in tradeLineItem.ReceivableSpecifiedTradeAccountingAccounts)
+                    {
+                        Writer.WriteStartElement("ram:ReceivableSpecifiedTradeAccountingAccount", Profile.Comfort | Profile.Extended);
+
+                        {
+                            Writer.WriteStartElement("ram:ID");
+                            Writer.WriteValue(RSTA.TradeAccountID);
+                            Writer.WriteEndElement(); // !ram:ID
+                        }
+
+                        if (RSTA.TradeAccountTypeCode != AccountingAccountTypeCodes.Unknown)
+                        {
+                            Writer.WriteStartElement("ram:TypeCode", Profile.Extended);
+                            Writer.WriteValue(((int)RSTA.TradeAccountTypeCode).ToString());
+                            Writer.WriteEndElement(); // !ram:TypeCode
+                        }
+
+                        Writer.WriteEndElement(); // !ram:ReceivableSpecifiedTradeAccountingAccount
+                    }
+                }
                 #endregion
 
                 Writer.WriteEndElement(); // !ram:SpecifiedLineTradeSettlement
@@ -421,19 +451,26 @@ namespace s2industries.ZUGFeRD
             #endregion
 
             #region ApplicableHeaderTradeAgreement
-            Writer.WriteStartElement("ram:ApplicableHeaderTradeAgreement");//CG
+            Writer.WriteStartElement("ram:ApplicableHeaderTradeAgreement");
+
+            // BT-12
             if (!String.IsNullOrEmpty(this.Descriptor.ReferenceOrderNo))
             {
                 Writer.WriteElementString("ram:BuyerReference", this.Descriptor.ReferenceOrderNo);
             }
 
             #region SellerTradeParty
+            // BT-31: this.Descriptor.SellerTaxRegistration
             _writeOptionalParty(Writer, "ram:SellerTradeParty", this.Descriptor.Seller, this.Descriptor.SellerContact, this.Descriptor.SellerTaxRegistration, descriptor.Profile);
             #endregion
 
             #region BuyerTradeParty
+            // BT-48: this.Descriptor.BuyerTaxRegistration
             _writeOptionalParty(Writer, "ram:BuyerTradeParty", this.Descriptor.Buyer, this.Descriptor.BuyerContact, this.Descriptor.BuyerTaxRegistration, descriptor.Profile);
             #endregion
+
+            /// TODO: implement SellerTaxRepresentativeTradeParty
+            /// BT-63: the tax registration of the SellerTaxRepresentativeTradeParty
 
             #region BuyerOrderReferencedDocument
             if (this.Descriptor.OrderDate.HasValue || ((this.Descriptor.OrderNo != null) && (this.Descriptor.OrderNo.Length > 0)))
@@ -455,6 +492,7 @@ namespace s2industries.ZUGFeRD
             #endregion            
 
             #region ContractReferencedDocument
+            // BT-12
             if (this.Descriptor.ContractReferencedDocument != null)
             {
                 Writer.WriteStartElement("ram:ContractReferencedDocument");
@@ -468,6 +506,8 @@ namespace s2industries.ZUGFeRD
                     Writer.WriteEndElement(); // !qdt:DateTimeString
                     Writer.WriteEndElement(); // !IssueDateTime()                    
                 }
+
+                Writer.WriteEndElement(); // !ram:ContractReferencedDocument
             }
             #endregion
 
@@ -573,23 +613,46 @@ namespace s2industries.ZUGFeRD
 
             #region ApplicableHeaderTradeSettlement
             Writer.WriteStartElement("ram:ApplicableHeaderTradeSettlement");
+            // order of sub-elements of ApplicableHeaderTradeSettlement:
+            //   1. CreditorReferenceID (optional)
+            //   2. PaymentReference (optional)
+            //   3. TaxCurrencyCode (optional)
+            //   4. InvoiceCurrencyCode (optional)
+            //   5. InvoiceIssuerReference (optional)
+            //   6. InvoicerTradeParty (optional)
+            //   7. InvoiceeTradeParty (optional)
+            //   8. PayeeTradeParty (optional)
+            //   9. TaxApplicableTradeCurrencyExchange (optional)
+            //  10. SpecifiedTradeSettlementPaymentMeans (optional)
+            //  11. ApplicableTradeTax (optional)
+            //  12. BillingSpecifiedPeriod (optional)
+            //  13. SpecifiedTradeAllowanceCharge (optional)
+            //  14. SpecifiedLogisticsServiceCharge (optional)
+            //  15. SpecifiedTradePaymentTerms (optional)
+            //  16. SpecifiedTradeSettlementHeaderMonetarySummation
+            //  17. InvoiceReferencedDocument (optional)
+            //  18. ReceivableSpecifiedTradeAccountingAccount (optional)
+            //  19. SpecifiedAdvancePayment (optional)
 
-            if (Descriptor.Profile == Profile.Extended)
-            {
-                _writeOptionalParty(Writer, "ram:InvoiceeTradeParty", this.Descriptor.Invoicee);
-            }
-            if (Descriptor.Profile != Profile.Minimum)
-            {
-                _writeOptionalParty(Writer, "ram:PayeeTradeParty", this.Descriptor.Payee);
-            }
 
+            //   2. PaymentReference (optional)
             if (!String.IsNullOrEmpty(this.Descriptor.PaymentReference))
             {
                 _writeOptionalElementString(Writer, "ram:PaymentReference", this.Descriptor.PaymentReference);
             }
+
+            //   4. InvoiceCurrencyCode (optional)
             Writer.WriteElementString("ram:InvoiceCurrencyCode", this.Descriptor.Currency.EnumToString());
 
-            #region SpecifiedTradeSettlementPaymentMeans (alle außer Minimum)
+            //   7. InvoiceeTradeParty (optional)
+            _writeOptionalParty(Writer, "ram:InvoiceeTradeParty", this.Descriptor.Invoicee, profile: Profile.Extended);
+
+            //   8. PayeeTradeParty (optional)
+            _writeOptionalParty(Writer, "ram:PayeeTradeParty", this.Descriptor.Payee, profile: ALL_PROFILES ^ Profile.Minimum);
+
+            #region SpecifiedTradeSettlementPaymentMeans
+            //  10. SpecifiedTradeSettlementPaymentMeans (optional)
+
             if (this.Descriptor.CreditorBankAccounts.Count == 0 && this.Descriptor.DebitorBankAccounts.Count == 0)
             {
                 if (this.Descriptor.PaymentMeans != null)
@@ -691,10 +754,12 @@ namespace s2industries.ZUGFeRD
             #endregion
 
             #region ApplicableTradeTax
+            //  11. ApplicableTradeTax (optional)
             _writeOptionalTaxes(Writer);
             #endregion
 
             #region BillingSpecifiedPeriod
+            //  12. BillingSpecifiedPeriod (optional)
             if (Descriptor.BillingPeriodStart.HasValue || Descriptor.BillingPeriodEnd.HasValue)
             {
                 Writer.WriteStartElement("ram:BillingSpecifiedPeriod", Profile.BasicWL | Profile.Basic | Profile.Comfort | Profile.Extended | Profile.XRechnung1 | Profile.XRechnung);
@@ -715,6 +780,7 @@ namespace s2industries.ZUGFeRD
             }
             #endregion
 
+            //  13. SpecifiedTradeAllowanceCharge (optional)
             if ((this.Descriptor.TradeAllowanceCharges != null) && (this.Descriptor.TradeAllowanceCharges.Count > 0))
             {
                 foreach (TradeAllowanceCharge tradeAllowanceCharge in this.Descriptor.TradeAllowanceCharges)
@@ -748,6 +814,7 @@ namespace s2industries.ZUGFeRD
                 }
             }
 
+            //  14. SpecifiedLogisticsServiceCharge (optional)
             if ((this.Descriptor.ServiceCharges != null) && (this.Descriptor.ServiceCharges.Count > 0))
             {
                 foreach (ServiceCharge serviceCharge in this.Descriptor.ServiceCharges)
@@ -771,6 +838,7 @@ namespace s2industries.ZUGFeRD
                 }
             }
 
+            //  15. SpecifiedTradePaymentTerms (optional)
             if (this.Descriptor.PaymentTerms != null)
             {
                 Writer.WriteStartElement("ram:SpecifiedTradePaymentTerms");
@@ -814,6 +882,48 @@ namespace s2industries.ZUGFeRD
             }
             #endregion
 
+            #region ReceivableSpecifiedTradeAccountingAccount
+            if (this.Descriptor.ReceivableSpecifiedTradeAccountingAccounts != null && this.Descriptor.ReceivableSpecifiedTradeAccountingAccounts.Count > 0)
+            {
+                if (descriptor.Profile == Profile.XRechnung1 || descriptor.Profile == Profile.XRechnung)
+                {
+                    if (!string.IsNullOrEmpty(this.Descriptor.ReceivableSpecifiedTradeAccountingAccounts[0].TradeAccountID))
+                    {
+                        Writer.WriteStartElement("ram:ReceivableSpecifiedTradeAccountingAccount");
+                        {
+                            //BT-19
+                            Writer.WriteStartElement("ram:ID");
+                            Writer.WriteValue(this.Descriptor.ReceivableSpecifiedTradeAccountingAccounts[0].TradeAccountID);
+                            Writer.WriteEndElement(); // !ram:ID
+                        }
+                        Writer.WriteEndElement(); // !ram:ReceivableSpecifiedTradeAccountingAccount
+                    }
+                }
+                else
+                {
+                    foreach (ReceivableSpecifiedTradeAccountingAccount RSTAA in this.Descriptor.ReceivableSpecifiedTradeAccountingAccounts)
+                    {
+                        Writer.WriteStartElement("ram:ReceivableSpecifiedTradeAccountingAccount", Profile.BasicWL | Profile.Basic | Profile.Comfort | Profile.Extended);
+                        
+                        {   
+                            //BT-19
+                            Writer.WriteStartElement("ram:ID", Profile.BasicWL | Profile.Basic | Profile.Comfort | Profile.Extended);
+                            Writer.WriteValue(RSTAA.TradeAccountID);
+                            Writer.WriteEndElement(); // !ram:ID
+                        }
+
+                        if (RSTAA.TradeAccountTypeCode != AccountingAccountTypeCodes.Unknown)
+                        {
+                            Writer.WriteStartElement("ram:TypeCode", Profile.Extended);
+                            Writer.WriteValue(((int)RSTAA.TradeAccountTypeCode).ToString());
+                            Writer.WriteEndElement(); // !ram:TypeCode
+                        }
+
+                        Writer.WriteEndElement(); // !ram:ReceivableSpecifiedTradeAccountingAccount
+                    }
+                }
+            }
+            #endregion
             Writer.WriteEndElement(); // !ram:ApplicableHeaderTradeSettlement
 
             #endregion
@@ -989,10 +1099,10 @@ namespace s2industries.ZUGFeRD
                 {
                     _writeOptionalContact(writer, "ram:DefinedTradeContact", contact, Profile.Extended | Profile.XRechnung1 | Profile.XRechnung);
                 }
-                else if ( ((profile & Profile.XRechnung) == Profile.XRechnung) || ((profile & Profile.XRechnung1) == Profile.XRechnung1) )
-                {
-                    _writeOptionalContact(writer, "ram:DefinedTradeContact", new Contact(), Profile.XRechnung1 | Profile.XRechnung);
-                }
+                //else if ( ((profile & Profile.XRechnung) == Profile.XRechnung) || ((profile & Profile.XRechnung1) == Profile.XRechnung1) )
+                //{
+                //    _writeOptionalContact(writer, "ram:DefinedTradeContact", new Contact(), Profile.XRechnung1 | Profile.XRechnung);
+                //}
 
                 writer.WriteStartElement("ram:PostalTradeAddress");
                 writer.WriteElementString("ram:PostcodeCode", party.Postcode);
