@@ -88,7 +88,18 @@ namespace s2industries.ZUGFeRD
         /// Currency of the invoice
         /// </summary>
         public CurrencyCodes Currency { get; set; }
+
+
+        /// <summary>
+        /// Information about the buyer
+        /// </summary>
         public Party Buyer { get; set; }
+
+        /// <summary>
+        /// Buyer contact information
+        ///  
+        /// A group of business terms providing contact information relevant for the buyer.
+        /// </summary>
         public Contact BuyerContact { get; set; }
         public List<TaxRegistration> BuyerTaxRegistration { get; set; } = new List<TaxRegistration>();
         public Party Seller { get; set; }
@@ -115,9 +126,28 @@ namespace s2industries.ZUGFeRD
         /// </summary>
         public Party ShipFrom { get; set; }
 
+        /// <summary>
+        /// Free text on header level
+        /// </summary>
         public List<Note> Notes { get; set; } = new List<Note>();
+
+        /// <summary>
+        /// The Indicator type may be used when implementing a new system in order to mark the invoice as „trial invoice“.
+        /// </summary>
         public bool IsTest { get; set; } = false;
+
+        /// <summary>
+        /// Representation of information that should be used for the document.
+        /// 
+        /// As the library can be used to both write ZUGFeRD files and read ZUGFeRD files, the profile serves two purposes:
+        /// It indicates the profile that was used to write the ZUGFeRD file that was loaded or the profile that is to be used when 
+        /// the document is saved.
+        /// </summary>
         public Profile Profile { get; internal set; } = Profile.Basic;
+
+        /// <summary>
+        /// Indicates the type of the document, if it represents an invoice, a credit note or one of the available 'sub types'
+        /// </summary>
         public InvoiceType Type { get; set; } = InvoiceType.Invoice;
 
         /// <summary>
@@ -127,28 +157,141 @@ namespace s2industries.ZUGFeRD
         /// BT-10
         /// </summary>
         public string ReferenceOrderNo { get; set; }
+
+        /// <summary>
+        /// An aggregation of business terms containing information about individual invoice positions
+        /// </summary>
         public List<TradeLineItem> TradeLineItems { get; internal set; } = new List<TradeLineItem>();
 
+        /// <summary>
+        /// Sum of all invoice line net amounts in the invoice
+        /// </summary>
+        public decimal? LineTotalAmount { get; set; } = null;
 
-        public decimal LineTotalAmount { get; set; } = Decimal.MinValue;
-        public decimal? ChargeTotalAmount { get; set; } = Decimal.MinValue;
-        public decimal? AllowanceTotalAmount { get; set; } = Decimal.MinValue;
-        public decimal? TaxBasisAmount { get; set; } = Decimal.MinValue;
-        public decimal TaxTotalAmount { get; set; } = Decimal.MinValue;
-        public decimal GrandTotalAmount { get; set; } = Decimal.MinValue;
-        public decimal? TotalPrepaidAmount { get; set; } = Decimal.MinValue;
-        public decimal DuePayableAmount { get; set; } = Decimal.MinValue;
+        /// <summary>
+        /// Sum of all surcharges on document level in the invoice
+        /// 
+        /// Surcharges on line level are included in the invoice line net amount which is summed up into the sum of invoice line net amount.
+        /// </summary>
+        public decimal? ChargeTotalAmount { get; set; } = null;
+
+        /// <summary>
+        /// Sum of discounts on document level in the invoice
+        /// 
+        /// Discounts on line level are included in the invoice line net amount which is summed up into the sum of invoice line net amount.
+        /// </summary>
+        public decimal? AllowanceTotalAmount { get; set; } = null;
+
+        /// <summary>
+        /// The total amount of the invoice without VAT.
+        /// 
+        /// The invoice total amount without VAT is the sum of invoice line net amount minus sum of discounts on document level plus sum of surcharges on document level.
+        /// </summary>
+        public decimal? TaxBasisAmount { get; set; } = null;
+
+        /// <summary>
+        /// The total VAT amount for the invoice.
+        /// The VAT total amount expressed in the accounting currency accepted or required in the country of the seller
+        /// 
+        /// To be used when the VAT accounting currency (BT-6) differs from the Invoice currency code (BT-5) in accordance 
+        /// with article 230 of Directive 2006/112 / EC on VAT. The VAT amount in accounting currency is not used
+        /// in the calculation of the Invoice totals..
+        /// </summary>
+        public decimal? TaxTotalAmount { get; set; } = null;
+
+        /// <summary>
+        /// Invoice total amount with VAT
+        /// 
+        /// The invoice total amount with VAT is the invoice without VAT plus the invoice total VAT amount.
+        /// </summary>
+        public decimal? GrandTotalAmount { get; set; } = null;
+
+        /// <summary>
+        /// Sum of amount paid in advance
+        /// 
+        /// This amount is subtracted from the invoice total amount with VAT to calculate the amount due for payment.
+        /// </summary>
+        public decimal? TotalPrepaidAmount { get; set; } = null;
+
+        /// <summary>
+        /// The amount to be added to the invoice total to round the amount to be paid.
+        /// </summary>
+        public decimal? RoundingAmount { get; set; } = null;
+
+        /// <summary>
+        /// The outstanding amount that is requested to be paid.
+        /// 
+        /// This amount is the invoice total amount with VAT minus the paid amount that has 
+        /// been paid in advance. The amount is zero in case of a fully paid invoice.
+        /// The amount may be negative; in that case the seller owes the amount to the buyer.
+        /// </summary>
+        public decimal? DuePayableAmount { get; set; } = null;
+
+        /// <summary>
+        /// A group of business terms providing information about VAT breakdown by different categories, rates and exemption reasons
+        /// </summary>
         public List<Tax> Taxes { get; set; } = new List<Tax>();
-        public List<ServiceCharge> ServiceCharges { get; set; } = new List<ServiceCharge>();
-        public List<TradeAllowanceCharge> TradeAllowanceCharges { get; set; } = new List<TradeAllowanceCharge>();
-        public PaymentTerms PaymentTerms { get; set; }        
-        public InvoiceReferencedDocument InvoiceReferencedDocument { get; set; }
-        public List<ReceivableSpecifiedTradeAccountingAccount> ReceivableSpecifiedTradeAccountingAccounts { get; internal set; } = new List<ReceivableSpecifiedTradeAccountingAccount>();
-        public List<BankAccount> CreditorBankAccounts { get; set; } = new List<BankAccount>();
-        public List<BankAccount> DebitorBankAccounts { get; set; } = new List<BankAccount>();
-        public PaymentMeans PaymentMeans { get; set; }
 
+        /// <summary>
+        /// Transport and packaging costs
+        /// </summary>
+        public List<ServiceCharge> ServiceCharges { get; set; } = new List<ServiceCharge>();
+
+        /// <summary>
+        /// Detailed information on discounts and charges
+        /// </summary>
+        public List<TradeAllowanceCharge> TradeAllowanceCharges { get; set; } = new List<TradeAllowanceCharge>();
+
+        /// <summary>
+        /// Detailed information about payment terms               
+        /// </summary>
+        public PaymentTerms PaymentTerms { get; set; }
+
+        /// <summary>
+        /// A group of business terms providing information about a preceding invoices.
+        /// 
+        /// To be used in case: 
+        /// — a preceding invoice is corrected; 
+        /// — preceding partial invoices are referred to from a final invoice; 
+        /// — preceding pre-payment invoices are referred to from a final invoice.
+        /// </summary>
+        public InvoiceReferencedDocument InvoiceReferencedDocument { get; set; }
+
+        /// <summary>
+        /// Detailed information about the accounting reference
+        /// </summary>
+        public List<ReceivableSpecifiedTradeAccountingAccount> ReceivableSpecifiedTradeAccountingAccounts { get; internal set; } = new List<ReceivableSpecifiedTradeAccountingAccount>();
+
+        /// <summary>
+        /// Credit Transfer
+        /// 
+        /// A group of business terms to specify credit transfer payments
+        /// </summary>
+        public List<BankAccount> CreditorBankAccounts { get; set; } = new List<BankAccount>();
+
+        /// <summary>
+        /// Buyer bank information
+        /// </summary>
+        public List<BankAccount> DebitorBankAccounts { get; set; } = new List<BankAccount>();
+
+        /// <summary>
+        /// Payment instructions
+        /// 
+        /// /// If various accounts for credit transfers shall be transferred, the element 
+        /// SpecifiedTradeSettlementPaymentMeans can be repeated for each account. The code 
+        /// for the type of payment within the element typecode (BT-81) should therefore not 
+        /// differ within the repetitions.
+        /// </summary> 
+        public PaymentMeans PaymentMeans { get; set; }
+ 
+        /// <summary>
+        /// Detailed information about the invoicing period, start date
+        /// </summary>   
         public DateTime? BillingPeriodStart { get; set; }
+
+        /// <summary>
+        /// Detailed information about the invoicing period, end date
+        /// </summary>
         public DateTime? BillingPeriodEnd { get; set; }
 
 
@@ -364,14 +507,24 @@ namespace s2industries.ZUGFeRD
         } // !AddAdditionalReferencedDocument()
 
 
-        public void SetBuyerOrderReferenceDocument(string orderNo, DateTime orderDate)
+        /// <summary>
+        /// Sets details of the associated order
+        /// </summary>
+        /// <param name="orderNo"></param>
+        /// <param name="orderDate"></param>
+        public void SetBuyerOrderReferenceDocument(string orderNo, DateTime? orderDate = null)
         {
             this.OrderNo = orderNo;
             this.OrderDate = orderDate;
         } // !SetBuyerOrderReferenceDocument()
 
 
-        public void SetDeliveryNoteReferenceDocument(string deliveryNoteNo, DateTime deliveryNoteDate)
+        /// <summary>
+        /// Sets detailed information about the corresponding delivery note
+        /// </summary>
+        /// <param name="deliveryNoteNo"></param>
+        /// <param name="deliveryNoteDate"></param>
+        public void SetDeliveryNoteReferenceDocument(string deliveryNoteNo, DateTime? deliveryNoteDate = null)
         {
             this.DeliveryNoteReferencedDocument = new DeliveryNoteReferencedDocument()
             {
@@ -464,10 +617,12 @@ namespace s2industries.ZUGFeRD
         /// <param name="grandTotalAmount">Bruttosumme</param>
         /// <param name="totalPrepaidAmount">Anzahlungsbetrag</param>
         /// <param name="duePayableAmount">Zahlbetrag</param>
-        public void SetTotals(decimal lineTotalAmount = decimal.MinValue, decimal chargeTotalAmount = decimal.MinValue,
-                              decimal allowanceTotalAmount = decimal.MinValue, decimal taxBasisAmount = decimal.MinValue,
-                              decimal taxTotalAmount = decimal.MinValue, decimal grandTotalAmount = decimal.MinValue,
-                              decimal totalPrepaidAmount = decimal.MinValue, decimal duePayableAmount = decimal.MinValue)
+        /// <param name="roundingAmount">RoundingAmount / Rundungsbetrag, profile COMFORT and EXTENDED</param>
+        public void SetTotals(decimal? lineTotalAmount = null, decimal? chargeTotalAmount = null,
+                              decimal? allowanceTotalAmount = null, decimal? taxBasisAmount = null,
+                              decimal? taxTotalAmount = null, decimal? grandTotalAmount = null,
+                              decimal? totalPrepaidAmount = null, decimal? duePayableAmount = null,
+                              decimal? roundingAmount = null)
         {
             this.LineTotalAmount = lineTotalAmount;
             this.ChargeTotalAmount = chargeTotalAmount;
@@ -477,6 +632,7 @@ namespace s2industries.ZUGFeRD
             this.GrandTotalAmount = grandTotalAmount;
             this.TotalPrepaidAmount = totalPrepaidAmount;
             this.DuePayableAmount = duePayableAmount;
+            this.RoundingAmount = roundingAmount;
         }
 
 
@@ -572,7 +728,6 @@ namespace s2industries.ZUGFeRD
 
         } // !AddTradeLineCommentItem()
 
-
         /// <summary>
         /// Adds a new comment as a dedicated line of the invoice.
         /// 
@@ -596,6 +751,7 @@ namespace s2industries.ZUGFeRD
 
             TradeLineItem item = new TradeLineItem()
             {
+                LineID = lineID,
                 AssociatedDocument = new ZUGFeRD.AssociatedDocument(lineID),
                 GrossUnitPrice = 0m,
                 NetUnitPrice= 0m,
@@ -641,17 +797,18 @@ namespace s2industries.ZUGFeRD
                                      string description = null,
                                      QuantityCodes unitCode = QuantityCodes.Unknown,
                                      decimal? unitQuantity = null,
-                                     decimal grossUnitPrice = Decimal.MinValue,
-                                     decimal netUnitPrice = Decimal.MinValue,
-                                     decimal billedQuantity = Decimal.MinValue,
+                                     decimal? grossUnitPrice = null,
+                                     decimal? netUnitPrice = null,
+                                     decimal billedQuantity = 0,
                                      TaxTypes taxType = TaxTypes.Unknown,
                                      TaxCategoryCodes categoryCode = TaxCategoryCodes.Unknown,
-                                     decimal taxPercent = Decimal.MinValue,
+                                     decimal taxPercent = 0,
                                      string comment = null,
                                      GlobalID id = null,
                                      string sellerAssignedID = "", string buyerAssignedID = "",
                                      string deliveryNoteID = "", DateTime? deliveryNoteDate = null,
-                                     string buyerOrderID = "", DateTime? buyerOrderDate = null)
+                                     string buyerOrderID = "", DateTime? buyerOrderDate = null,
+                                     DateTime? billingPeriodStart = null, DateTime? billingPerdiodEnd = null)
         {
             return AddTradeLineItem(lineID: _getNextLineId(),
                              name: name,
@@ -668,7 +825,9 @@ namespace s2industries.ZUGFeRD
                              id: id,
                              sellerAssignedID: sellerAssignedID,
                              deliveryNoteID: deliveryNoteID,
-                             buyerOrderID: buyerOrderID);
+                             buyerOrderID: buyerOrderID,
+                             billingPeriodStart: billingPeriodStart,
+                             billingPeriodEnd: BillingPeriodEnd);
 
         } // !AddTradeLineItem()
 
@@ -677,34 +836,27 @@ namespace s2industries.ZUGFeRD
         /// <summary>
         /// Adds a new line to the invoice. The line id is passed as a parameter.
         /// </summary>
-        // TODO Rabatt ergänzen:
-        // <ram:AppliedTradeAllowanceCharge>
-        //     <ram:ChargeIndicator><udt:Indicator>false</udt:Indicator></ram:ChargeIndicator>
-        //     <ram:CalculationPercent>2.00</ram:CalculationPercent>
-        //     <ram:BasisAmount currencyID = "EUR" > 1.5000 </ram:BasisAmount>
-        //     <ram:ActualAmount currencyID = "EUR" > 0.0300 </ram:ActualAmount>
-        //     <ram:Reason>Artikelrabatt 1</ram:Reason>
-        // </ram:AppliedTradeAllowanceCharge>
         public TradeLineItem AddTradeLineItem(string lineID,
                                      string name,
                                      string description = null,
                                      QuantityCodes unitCode = QuantityCodes.Unknown,
                                      decimal? unitQuantity = null,
-                                     decimal grossUnitPrice = 0,
-                                     decimal netUnitPrice = 0,
+                                     decimal? grossUnitPrice = null,
+                                     decimal? netUnitPrice = null,
                                      decimal billedQuantity = 0,
                                      TaxTypes taxType = TaxTypes.Unknown,
                                      TaxCategoryCodes categoryCode = TaxCategoryCodes.Unknown,
-                                     decimal taxPercent = Decimal.MinValue,
+                                     decimal taxPercent = 0,
                                      string comment = null,
                                      GlobalID id = null,
                                      string sellerAssignedID = "", string buyerAssignedID = "",
                                      string deliveryNoteID = "", DateTime? deliveryNoteDate = null,
-                                     string buyerOrderID = "", DateTime? buyerOrderDate = null
-                                     )
+                                     string buyerOrderID = "", DateTime? buyerOrderDate = null,
+                                     DateTime? billingPeriodStart = null, DateTime? billingPeriodEnd = null)
         {
             TradeLineItem newItem = new TradeLineItem()
             {
+                LineID = lineID,
                 GlobalID = id,
                 SellerAssignedID = sellerAssignedID,
                 BuyerAssignedID = buyerAssignedID,
@@ -717,7 +869,9 @@ namespace s2industries.ZUGFeRD
                 BilledQuantity = billedQuantity,
                 TaxType = taxType,
                 TaxCategoryCode = categoryCode,
-                TaxPercent = taxPercent                
+                TaxPercent = taxPercent,
+                BillingPeriodStart = billingPeriodStart,
+                BillingPeriodEnd = billingPeriodEnd
             };
 
             if (String.IsNullOrEmpty(lineID))

@@ -107,7 +107,7 @@ namespace s2industries.ZUGFeRD
             _writeOptionalParty(Writer, "ram:SellerTradeParty", this.Descriptor.Seller, this.Descriptor.SellerContact, TaxRegistrations: this.Descriptor.SellerTaxRegistration);
             _writeOptionalParty(Writer, "ram:BuyerTradeParty", this.Descriptor.Buyer, this.Descriptor.BuyerContact, TaxRegistrations: this.Descriptor.BuyerTaxRegistration);
 
-            if (this.Descriptor.OrderDate.HasValue || ((this.Descriptor.OrderNo != null) && (this.Descriptor.OrderNo.Length > 0)))
+            if (!String.IsNullOrEmpty(this.Descriptor.OrderNo))
             {
                 Writer.WriteStartElement("ram:BuyerOrderReferencedDocument");
                 if (this.Descriptor.OrderDate.HasValue)
@@ -587,17 +587,17 @@ namespace s2industries.ZUGFeRD
                     Writer.WriteEndElement(); // !ram:ApplicableTradeTax
                 }
 
-                if (Descriptor.BillingPeriodStart.HasValue && Descriptor.BillingPeriodEnd.HasValue)
+                if (tradeLineItem.BillingPeriodStart.HasValue && tradeLineItem.BillingPeriodEnd.HasValue)
                 {
                     Writer.WriteStartElement("ram:BillingSpecifiedPeriod", Profile.BasicWL | Profile.Basic | Profile.Comfort | Profile.Extended | Profile.XRechnung1 | Profile.XRechnung);
 
                     Writer.WriteStartElement("ram:StartDateTime");
-                    _writeElementWithAttribute(Writer, "udt:DateTimeString", "format", "102", _formatDate(this.Descriptor.BillingPeriodStart.Value));
+                    _writeElementWithAttribute(Writer, "udt:DateTimeString", "format", "102", _formatDate(tradeLineItem.BillingPeriodStart.Value));
                     Writer.WriteEndElement(); // !StartDateTime
 
 
                     Writer.WriteStartElement("ram:EndDateTime");
-                    _writeElementWithAttribute(Writer, "udt:DateTimeString", "format", "102", _formatDate(this.Descriptor.BillingPeriodEnd.Value));
+                    _writeElementWithAttribute(Writer, "udt:DateTimeString", "format", "102", _formatDate(tradeLineItem.BillingPeriodEnd.Value));
                     Writer.WriteEndElement(); // !EndDateTime
 
                     Writer.WriteEndElement(); // !BillingSpecifiedPeriod
@@ -611,9 +611,9 @@ namespace s2industries.ZUGFeRD
                 {
                     _total = tradeLineItem.LineTotalAmount.Value;
                 }
-                else
+                else if (tradeLineItem.NetUnitPrice.HasValue)
                 {
-                    _total = tradeLineItem.NetUnitPrice * tradeLineItem.BilledQuantity;
+                    _total = tradeLineItem.NetUnitPrice.Value * tradeLineItem.BilledQuantity;
                 }
 
                 _writeElementWithAttribute(Writer, "ram:LineTotalAmount", "currencyID", this.Descriptor.Currency.EnumToString(), _formatDecimal(_total));

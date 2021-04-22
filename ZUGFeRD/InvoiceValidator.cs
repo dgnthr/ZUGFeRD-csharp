@@ -67,8 +67,12 @@ namespace s2industries.ZUGFeRD
             Dictionary<decimal, decimal> lineTotalPerTax = new Dictionary<decimal, decimal>();
             foreach(TradeLineItem item in descriptor.TradeLineItems)
             {
-                decimal _total = decimal.Multiply(item.NetUnitPrice, item.BilledQuantity);
-                lineTotal += _total;
+                decimal _total = 0m;
+                if (item.NetUnitPrice.HasValue)
+                {
+                    _total = decimal.Multiply(item.NetUnitPrice.Value, item.BilledQuantity);
+                    lineTotal += _total;
+                }
 
                 if (!lineTotalPerTax.ContainsKey(item.TaxPercent))
                 {
@@ -150,7 +154,11 @@ namespace s2industries.ZUGFeRD
                 _allowanceTotal += allowance.ActualAmount;
             }
 
-            if (Math.Abs(taxTotal - descriptor.TaxTotalAmount) < 0.01m)
+            if (!descriptor.TaxTotalAmount.HasValue)
+            {
+                retval.Add(String.Format("trade.settlement.monetarySummation.taxTotal Message: Kein TaxTotalAmount vorhanden"));
+            }
+            else if (Math.Abs(taxTotal - descriptor.TaxTotalAmount.Value) < 0.01m)
             {
                 retval.Add(String.Format("trade.settlement.monetarySummation.taxTotal Message: Berechneter Wert ist wie vorhanden:[{0:0.0000}]", taxTotal));
             }
@@ -159,7 +167,7 @@ namespace s2industries.ZUGFeRD
                 retval.Add(String.Format("trade.settlement.monetarySummation.taxTotal Message: Berechneter Wert ist[{0:0.0000}] aber tatsächliche vorhander Wert ist[{1:0.0000}] | Actual value: {1:0.0000})", taxTotal, descriptor.TaxTotalAmount));
             }
 
-            if (Math.Abs(lineTotal - descriptor.LineTotalAmount) < 0.01m)
+            if (Math.Abs(lineTotal - descriptor.LineTotalAmount.Value) < 0.01m)
             {
                 retval.Add(String.Format("trade.settlement.monetarySummation.lineTotal Message: Berechneter Wert ist wie vorhanden:[{0:0.0000}]", lineTotal));
             }
@@ -168,7 +176,11 @@ namespace s2industries.ZUGFeRD
                 retval.Add(String.Format("trade.settlement.monetarySummation.lineTotal Message: Berechneter Wert ist[{0:0.0000}] aber tatsächliche vorhander Wert ist[{1:0.0000}] | Actual value: {1:0.0000})", lineTotal, descriptor.LineTotalAmount));
             }
 
-            if (Math.Abs(grandTotal - descriptor.GrandTotalAmount) < 0.01m)
+            if (!descriptor.GrandTotalAmount.HasValue)
+            {
+                retval.Add(String.Format("trade.settlement.monetarySummation.grandTotal Message: Kein GrandTotalAmount vorhanden"));
+            }
+            else if (Math.Abs(grandTotal - descriptor.GrandTotalAmount.Value) < 0.01m)
             {
                 retval.Add(String.Format("trade.settlement.monetarySummation.grandTotal Message: Berechneter Wert ist wie vorhanden:[{0:0.0000}]", grandTotal));
             }

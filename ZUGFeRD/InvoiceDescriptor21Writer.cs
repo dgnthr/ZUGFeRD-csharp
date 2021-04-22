@@ -148,6 +148,17 @@ namespace s2industries.ZUGFeRD
                 _writeOptionalElementString(Writer, "ram:Name", !isCommentItem ? tradeLineItem.Name : "TEXT", Profile.XRechnung1 | Profile.XRechnung); // XRechnung erfordert einen Item-Namen
                 _writeOptionalElementString(Writer, "ram:Description", tradeLineItem.Description, Profile.Comfort | Profile.Extended | Profile.XRechnung1 | Profile.XRechnung);
 
+                if (tradeLineItem.ApplicableProductCharacteristics != null && tradeLineItem.ApplicableProductCharacteristics.Any())
+                {
+                    foreach (var productCharacteristic in tradeLineItem.ApplicableProductCharacteristics)
+                    {
+                        Writer.WriteStartElement("ram:ApplicableProductCharacteristic");
+                        _writeOptionalElementString(Writer, "ram:Description", productCharacteristic.Description);
+                        _writeOptionalElementString(Writer, "ram:Value", productCharacteristic.Value);
+                        Writer.WriteEndElement(); // !ram:ApplicableProductCharacteristic
+                    }
+                }
+
                 Writer.WriteEndElement(); // !ram:SpecifiedTradeProduct(Basic|Comfort|Extended|XRechnung)
                 #endregion
 
@@ -250,7 +261,7 @@ namespace s2industries.ZUGFeRD
 
                     #region GrossPriceProductTradePrice (Comfort, Extended, XRechnung)                 
                     Writer.WriteStartElement("ram:GrossPriceProductTradePrice", Profile.Comfort | Profile.Extended | Profile.XRechnung1 | Profile.XRechnung);
-                    _writeOptionalAmount(Writer, "ram:ChargeAmount", tradeLineItem.GrossUnitPrice, 2);
+                    _writeOptionalAmount(Writer, "ram:ChargeAmount", tradeLineItem.GrossUnitPrice, 4);
                     if (tradeLineItem.UnitQuantity.HasValue)
                     {
                         _writeElementWithAttribute(Writer, "ram:BasisQuantity", "unitCode", tradeLineItem.UnitCode.EnumToString(), _formatDecimal(tradeLineItem.UnitQuantity.Value, 4));
@@ -368,9 +379,25 @@ namespace s2industries.ZUGFeRD
                 Writer.WriteEndElement(); // !ram:ApplicableTradeTax(Basic|Comfort|Extended|XRechnung)
                 #endregion // !ApplicableTradeTax(Basic|Comfort|Extended|XRechnung)
 
-                #region BillingSpecifiedPeriod (Comfort, Extended)
-                //Eine Gruppe von betriebswirtschaftlichen Begriffen, die Informationen über den für die Rechnungsposition maßgeblichen Zeitraum enthält
-                //ToDo: BillingSpecifiedPeriod für Comfort und Extended
+                #region BillingSpecifiedPeriod
+                if (tradeLineItem.BillingPeriodStart.HasValue || tradeLineItem.BillingPeriodEnd.HasValue)
+                {
+                    Writer.WriteStartElement("ram:BillingSpecifiedPeriod", Profile.BasicWL | Profile.Basic | Profile.Comfort | Profile.Extended | Profile.XRechnung1 | Profile.XRechnung);
+                    if (tradeLineItem.BillingPeriodStart.HasValue)
+                    {
+                        Writer.WriteStartElement("ram:StartDateTime");
+                        _writeElementWithAttribute(Writer, "udt:DateTimeString", "format", "102", _formatDate(tradeLineItem.BillingPeriodStart.Value));
+                        Writer.WriteEndElement(); // !StartDateTime
+                    }
+
+                    if (tradeLineItem.BillingPeriodEnd.HasValue)
+                    {
+                        Writer.WriteStartElement("ram:EndDateTime");
+                        _writeElementWithAttribute(Writer, "udt:DateTimeString", "format", "102", _formatDate(tradeLineItem.BillingPeriodEnd.Value));
+                        Writer.WriteEndElement(); // !EndDateTime
+                    }
+                    Writer.WriteEndElement(); // !BillingSpecifiedPeriod
+                }
                 #endregion
 
                 #region SpecifiedTradeAllowanceCharge
@@ -386,9 +413,9 @@ namespace s2industries.ZUGFeRD
                 {
                     _total = tradeLineItem.LineTotalAmount.Value;
                 }
-                else
+                else if (tradeLineItem.NetUnitPrice.HasValue)
                 {
-                    _total = tradeLineItem.NetUnitPrice * tradeLineItem.BilledQuantity;
+                    _total = tradeLineItem.NetUnitPrice.Value * tradeLineItem.BilledQuantity;
                 }
 
                 Writer.WriteStartElement("ram:LineTotalAmount", Profile.Basic | Profile.Comfort | Profile.Extended | Profile.XRechnung1 | Profile.XRechnung);
@@ -407,7 +434,7 @@ namespace s2industries.ZUGFeRD
 
                 #region ReceivableSpecifiedTradeAccountingAccount
                 //Detailinformationen zur Buchungsreferenz
-                if (descriptor.Profile == Profile.XRechnung1 || descriptor.Profile == Profile.XRechnung && tradeLineItem.ReceivableSpecifiedTradeAccountingAccounts.Count > 0)
+                if ((descriptor.Profile == Profile.XRechnung1 || descriptor.Profile == Profile.XRechnung) && tradeLineItem.ReceivableSpecifiedTradeAccountingAccounts.Count > 0)
                 {
                     //only one ReceivableSpecifiedTradeAccountingAccount (BT-133) is allowed in Profile XRechnung
                     Writer.WriteStartElement("ram:ReceivableSpecifiedTradeAccountingAccount", Profile.Comfort | Profile.Extended | Profile.XRechnung1 | Profile.XRechnung);
@@ -473,7 +500,7 @@ namespace s2industries.ZUGFeRD
             /// BT-63: the tax registration of the SellerTaxRepresentativeTradeParty
 
             #region BuyerOrderReferencedDocument
-            if (this.Descriptor.OrderDate.HasValue || ((this.Descriptor.OrderNo != null) && (this.Descriptor.OrderNo.Length > 0)))
+            if (!String.IsNullOrEmpty(this.Descriptor.OrderNo))
             {
                 Writer.WriteStartElement("ram:BuyerOrderReferencedDocument");
                 Writer.WriteElementString("ram:IssuerAssignedID", this.Descriptor.OrderNo);
@@ -858,9 +885,19 @@ namespace s2industries.ZUGFeRD
             _writeOptionalAmount(Writer, "ram:LineTotalAmount", this.Descriptor.LineTotalAmount);                                  // Summe der Nettobeträge aller Rechnungspositionen
             _writeOptionalAmount(Writer, "ram:ChargeTotalAmount", this.Descriptor.ChargeTotalAmount);                              // S umme der Zuschläge auf Dokumentenebene
             _writeOptionalAmount(Writer, "ram:AllowanceTotalAmount", this.Descriptor.AllowanceTotalAmount);                        // Summe der Abschläge auf Dokumentenebene
-            _writeOptionalAmount(Writer, "ram:TaxBasisTotalAmount", this.Descriptor.TaxBasisAmount, profile: Profile.Extended);   // Rechnungsgesamtbetrag ohne Umsatzsteuer
+
+            if (this.Descriptor.Profile == Profile.Extended)
+            {
+                // there shall be no currency for tax basis total amount, see
+                // https://github.com/stephanstapel/ZUGFeRD-csharp/issues/56#issuecomment-655525467
+                _writeOptionalAmount(Writer, "ram:TaxBasisTotalAmount", this.Descriptor.TaxBasisAmount, forceCurrency: false);   // Rechnungsgesamtbetrag ohne Umsatzsteuer
+            }
+            else
+            {
+                _writeOptionalAmount(Writer, "ram:TaxBasisTotalAmount", this.Descriptor.TaxBasisAmount);   // Rechnungsgesamtbetrag ohne Umsatzsteuer
+            }
             _writeOptionalAmount(Writer, "ram:TaxTotalAmount", this.Descriptor.TaxTotalAmount, forceCurrency: true);               // Gesamtbetrag der Rechnungsumsatzsteuer, Steuergesamtbetrag in Buchungswährung
-                                                                                                                                   // ToDo: RoundingAmount  //Rundungsbetrag
+            _writeOptionalAmount(Writer, "ram:RoundingAmount", this.Descriptor.RoundingAmount, profile: Profile.Comfort | Profile.Extended);  // RoundingAmount  //Rundungsbetrag
             _writeOptionalAmount(Writer, "ram:GrandTotalAmount", this.Descriptor.GrandTotalAmount);                                // Rechnungsgesamtbetrag einschließlich Umsatzsteuer
             _writeOptionalAmount(Writer, "ram:TotalPrepaidAmount", this.Descriptor.TotalPrepaidAmount);                            // Vorauszahlungsbetrag
             _writeOptionalAmount(Writer, "ram:DuePayableAmount", this.Descriptor.DuePayableAmount);                                // Fälliger Zahlungsbetrag
@@ -985,7 +1022,7 @@ namespace s2industries.ZUGFeRD
         {
             if (value.HasValue && (value.Value != decimal.MinValue))
             {
-                writer.WriteStartElement(tagName);
+                writer.WriteStartElement(tagName, profile);
                 if (forceCurrency)
                 {
                     writer.WriteAttributeString("currencyID", this.Descriptor.Currency.EnumToString());

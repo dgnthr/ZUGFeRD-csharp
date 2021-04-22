@@ -19,6 +19,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text;
 using System.Xml;
 
@@ -129,6 +130,17 @@ namespace s2industries.ZUGFeRD
                 _writeOptionalElementString(Writer, "ram:BuyerAssignedID", tradeLineItem.BuyerAssignedID);
                 _writeOptionalElementString(Writer, "ram:Name", tradeLineItem.Name);
                 _writeOptionalElementString(Writer, "ram:Description", tradeLineItem.Description);
+
+                if (tradeLineItem.ApplicableProductCharacteristics != null && tradeLineItem.ApplicableProductCharacteristics.Any())
+                {
+                    foreach (var productCharacteristic in tradeLineItem.ApplicableProductCharacteristics)
+                    {
+                        Writer.WriteStartElement("ram:ApplicableProductCharacteristic");
+                        _writeOptionalElementString(Writer, "ram:Description", productCharacteristic.Description);
+                        _writeOptionalElementString(Writer, "ram:Value", productCharacteristic.Value);
+                        Writer.WriteEndElement(); // !ram:ApplicableProductCharacteristic
+                    }
+                }
 
                 Writer.WriteEndElement(); // !ram:SpecifiedTradeProduct
 
@@ -301,20 +313,20 @@ namespace s2industries.ZUGFeRD
                 Writer.WriteElementString("ram:RateApplicablePercent", _formatDecimal(tradeLineItem.TaxPercent));
                 Writer.WriteEndElement(); // !ram:ApplicableTradeTax
 
-                if (Descriptor.BillingPeriodStart.HasValue || Descriptor.BillingPeriodEnd.HasValue)
+                if (tradeLineItem.BillingPeriodStart.HasValue || tradeLineItem.BillingPeriodEnd.HasValue)
                 {
                     Writer.WriteStartElement("ram:BillingSpecifiedPeriod", Profile.BasicWL | Profile.Basic | Profile.Comfort | Profile.Extended | Profile.XRechnung1 | Profile.XRechnung);
-                    if (Descriptor.BillingPeriodStart.HasValue)
+                    if (tradeLineItem.BillingPeriodStart.HasValue)
                     {
                         Writer.WriteStartElement("ram:StartDateTime");
-                        _writeElementWithAttribute(Writer, "udt:DateTimeString", "format", "102", _formatDate(this.Descriptor.BillingPeriodStart.Value));
+                        _writeElementWithAttribute(Writer, "udt:DateTimeString", "format", "102", _formatDate(tradeLineItem.BillingPeriodStart.Value));
                         Writer.WriteEndElement(); // !StartDateTime
                     }
 
-                    if (Descriptor.BillingPeriodEnd.HasValue)
+                    if (tradeLineItem.BillingPeriodEnd.HasValue)
                     {
                         Writer.WriteStartElement("ram:EndDateTime");
-                        _writeElementWithAttribute(Writer, "udt:DateTimeString", "format", "102", _formatDate(this.Descriptor.BillingPeriodEnd.Value));
+                        _writeElementWithAttribute(Writer, "udt:DateTimeString", "format", "102", _formatDate(tradeLineItem.BillingPeriodEnd.Value));
                         Writer.WriteEndElement(); // !EndDateTime
                     }
                     Writer.WriteEndElement(); // !BillingSpecifiedPeriod
@@ -328,9 +340,9 @@ namespace s2industries.ZUGFeRD
                 {
                     _total = tradeLineItem.LineTotalAmount.Value;
                 }
-                else
+                else if (tradeLineItem.NetUnitPrice.HasValue)
                 {
-                    _total = tradeLineItem.NetUnitPrice * tradeLineItem.BilledQuantity;
+                    _total = tradeLineItem.NetUnitPrice.Value * tradeLineItem.BilledQuantity;
                 }
 
                 _writeElementWithAttribute(Writer, "ram:LineTotalAmount", "currencyID", this.Descriptor.Currency.EnumToString(), _formatDecimal(_total));
@@ -349,7 +361,7 @@ namespace s2industries.ZUGFeRD
             _writeOptionalParty(Writer, "ram:SellerTradeParty", this.Descriptor.Seller, this.Descriptor.SellerContact, TaxRegistrations: this.Descriptor.SellerTaxRegistration);
             _writeOptionalParty(Writer, "ram:BuyerTradeParty", this.Descriptor.Buyer, this.Descriptor.BuyerContact, TaxRegistrations: this.Descriptor.BuyerTaxRegistration);
 
-            if (this.Descriptor.OrderDate.HasValue || ((this.Descriptor.OrderNo != null) && (this.Descriptor.OrderNo.Length > 0)))
+            if (!String.IsNullOrEmpty(this.Descriptor.OrderNo))
             {
                 Writer.WriteStartElement("ram:BuyerOrderReferencedDocument");
                 Writer.WriteElementString("ram:IssuerAssignedID", this.Descriptor.OrderNo);
@@ -603,6 +615,28 @@ namespace s2industries.ZUGFeRD
             //  11. ApplicableTradeTax (optional)
             _writeOptionalTaxes(Writer);
 
+            #region BillingSpecifiedPeriod
+            //  12. BillingSpecifiedPeriod (optional)
+            if (Descriptor.BillingPeriodStart.HasValue || Descriptor.BillingPeriodEnd.HasValue)
+            {
+                Writer.WriteStartElement("ram:BillingSpecifiedPeriod", Profile.BasicWL | Profile.Basic | Profile.Comfort | Profile.Extended | Profile.XRechnung1 | Profile.XRechnung);
+                if (Descriptor.BillingPeriodStart.HasValue)
+                {
+                    Writer.WriteStartElement("ram:StartDateTime");
+                    _writeElementWithAttribute(Writer, "udt:DateTimeString", "format", "102", _formatDate(this.Descriptor.BillingPeriodStart.Value));
+                    Writer.WriteEndElement(); // !StartDateTime
+                }
+
+                if (Descriptor.BillingPeriodEnd.HasValue)
+                {
+                    Writer.WriteStartElement("ram:EndDateTime");
+                    _writeElementWithAttribute(Writer, "udt:DateTimeString", "format", "102", _formatDate(this.Descriptor.BillingPeriodEnd.Value));
+                    Writer.WriteEndElement(); // !EndDateTime
+                }
+                Writer.WriteEndElement(); // !BillingSpecifiedPeriod
+            }
+            #endregion
+
             //  13. SpecifiedTradeAllowanceCharge (optional)
             if ((this.Descriptor.TradeAllowanceCharges != null) && (this.Descriptor.TradeAllowanceCharges.Count > 0))
             {
@@ -684,6 +718,7 @@ namespace s2industries.ZUGFeRD
             _writeOptionalAmount(Writer, "ram:AllowanceTotalAmount", this.Descriptor.AllowanceTotalAmount);
             _writeOptionalAmount(Writer, "ram:TaxBasisTotalAmount", this.Descriptor.TaxBasisAmount);
             _writeOptionalAmount(Writer, "ram:TaxTotalAmount", this.Descriptor.TaxTotalAmount);
+            _writeOptionalAmount(Writer, "ram:RoundingAmount", this.Descriptor.RoundingAmount, profile: Profile.Comfort | Profile.Extended);  // RoundingAmount  //Rundungsbetrag
             _writeOptionalAmount(Writer, "ram:GrandTotalAmount", this.Descriptor.GrandTotalAmount);
 
             if (this.Descriptor.TotalPrepaidAmount.HasValue)
@@ -724,11 +759,11 @@ namespace s2industries.ZUGFeRD
         } // !Save()
 
 
-        private void _writeOptionalAmount(ProfileAwareXmlTextWriter writer, string tagName, decimal? value, int numDecimals = 2)
+        private void _writeOptionalAmount(ProfileAwareXmlTextWriter writer, string tagName, decimal? value, int numDecimals = 2, Profile profile = Profile.Unknown)
         {
             if (value.HasValue && (value.Value != decimal.MinValue))
             {
-                writer.WriteStartElement(tagName);
+                writer.WriteStartElement(tagName, profile);
                 writer.WriteAttributeString("currencyID", this.Descriptor.Currency.EnumToString());
                 writer.WriteValue(_formatDecimal(value.Value, numDecimals));
                 writer.WriteEndElement(); // !tagName
